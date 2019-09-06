@@ -1,0 +1,11 @@
+Organização do diretório
+tst/ - testes do emulador usando o formato nrom.
+res/ - respostas dos testes.
+log/ - saída do emulador.
+ext/ - diretório com o código do asm6f.
+bin/ - binários gerados pelo makefile.
+
+Regras do makefile
+make test - roda todos os testes do emulador e compara com as respostas em res/
+make clean - limpa todos os arquivos
+make setup - instala as dependências do emulador (Ubuntu 18.04 lts).
