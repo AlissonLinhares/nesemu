@@ -1,34 +1,71 @@
 #include <iostream>
-#include <iomanip>
 #include <stdint.h>
-#include <bitset>
+#include <fstream>
 
-using namespace std;
+#include <cpu.h>
+#include <ppu.h>
+#include <iobus.h>
+#include <iointerface.h>
+#include <config.h>
+#include <joypad.h>
+#include <memory.h>
+#include <video.h>
 
-void print(uint8_t a, uint8_t x, uint8_t y, uint16_t sp, uint16_t pc, uint8_t p) {
-	cout << setfill('0')
-	     << "| pc = 0x" << hex << setw(4) << pc
-	     << " | a = 0x" << hex << setw(2) << (unsigned) a
-	     << " | x = 0x" << hex << setw(2) << (unsigned) x
-	     << " | y = 0x" << hex << setw(2) << (unsigned) y
-	     << " | sp = 0x" << hex << setw(4) << sp
-	     << " | p[NV-BDIZC] = " << bitset<8>(p) << " |" << endl;
-}
+using namespace nesemu;
 
-void printls(uint8_t a, uint8_t x, uint8_t y, uint16_t sp, uint16_t pc, uint8_t p, uint16_t addr, uint8_t data) {
-	cout << setfill('0')
-	     << "| pc = 0x" << hex << setw(4) << pc
-	     << " | a = 0x" << hex << setw(2) << (unsigned) a
-	     << " | x = 0x" << hex << setw(2) << (unsigned) x
-	     << " | y = 0x" << hex << setw(2) << (unsigned) y
-	     << " | sp = 0x" << hex << setw(4) << sp
-	     << " | p[NV-BDIZC] = " << bitset<8>(p)
-	     << " | MEM[0x" << hex << setw(4) << addr
-	     << "] = 0x" << hex << setw(2) << (unsigned) data << " |" << endl;
+bool loadBinary(Memory &memory, const char *path) {
+	ifstream file(path, ios::in|ios::binary|ios::ate);
+
+	if (file.is_open()) {
+		streampos size = file.tellg();
+		char *data = new char[size];
+
+		file.seekg(0, ios::beg);
+		file.read(data, size);
+		file.close();
+
+		// .db "NES", $1a ;identification of the iNES header
+		// .db PRG_COUNT ;number of 16KB PRG-ROM pages
+		// .db $01 ;number of 8KB CHR-ROM pages
+		// .db $00|MIRRORING ;mapper 0 and mirroring
+		// .dsb 9, $00 ;clear the remaining bytes
+
+		if (data[0] == 'N' && data[1] == 'E' && data[2] == 'S')
+			memory.setCHRAddr(1 << 14);
+
+		for (int i = 0; i < size; i++)
+			memory.write(i, (uint8_t) data[i]);
+
+		return true;
+	}
+
+	return false;
 }
 
 int main(int argc, const char *argv[]) {
-	print(0xFF, 0xEE, 0xDD, 0xCCCC, 0xBBBB, 0xAA);
-	printls(0xFF, 0xEE, 0xDD, 0xCCCC, 0xBBBB, 0xAA, 0xFFFF, 0x99);
+	if (argc != 2) {
+		cout << "Usage: ./nesemu 5602binary" << endl;
+		return 1;
+	}
+
+	Memory memory;
+	if (!loadBinary(memory, argv[1])) {
+		cout << "Unable to open file at: " << argv[1] << endl;
+		return 1;
+	}
+
+	Joypad joypads;
+	Video video(32,32);
+
+	IOBus bus(memory);
+	// PPU ppu(bus, memory.getCHRAddr());
+
+	bus.connect(video);
+	bus.connect(joypads);
+
+	CPU cpu(bus);
+	cpu.run();
+
+	memory.dump();
 	return 0;
 }

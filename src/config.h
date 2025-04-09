@@ -1,0 +1,2 @@
+#define DEFAULT_MEMORY_SIZE 65536
+#define DEBUG 1
